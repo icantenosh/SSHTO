@@ -1,0 +1,19 @@
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Local saved server data should never be committed.
+servers.json
+ssh-tool/
+
+# Keep the release exe tracked.
+!sshto.exe

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="170" viewBox="0 0 720 170" role="img" aria-labelledby="title desc">
+  <title id="title">SSHTO splash screen</title>
+  <desc id="desc">Green ANSI-style SSHTO terminal splash screen.</desc>
+  <rect width="720" height="170" fill="#0b1010"/>
+  <text x="30" y="36" fill="#39ff88" font-family="Consolas, 'Cascadia Mono', 'Courier New', monospace" font-size="18" xml:space="preserve">
+    <tspan x="30" dy="0">   ________  ________  ___  ___  _________  ________     </tspan>
+    <tspan x="30" dy="18">  |\   ____\|\   ____\|\  \|\  \|\___   ___\\   __  \    </tspan>
+    <tspan x="30" dy="18">  \ \  \___|\ \  \___|\ \  \\\  \|___ \  \_\ \  \|\  \   </tspan>
+    <tspan x="30" dy="18">   \ \_____  \ \_____  \ \   __  \   \ \  \ \ \  \\\  \  </tspan>
+    <tspan x="30" dy="18">    \|____|\  \|____|\  \ \  \ \  \   \ \  \ \ \  \\\  \ </tspan>
+    <tspan x="30" dy="18">      ____\_\  \____\_\  \ \__\ \__\   \ \__\ \ \_______\</tspan>
+    <tspan x="30" dy="18">     |\_________\_________\|__|\|__|    \|__|  \|_______|</tspan>
+    <tspan x="30" dy="18">     \|_________\|_________|</tspan><tspan fill="#7f8a8a">  &lt;&lt; encrypted routes / fast shells &gt;&gt;</tspan>
+  </text>
+</svg>
