@@ -34,15 +34,20 @@ sshto demo-server
 
 ## Linux
 
-1. Copy `sshto` into a folder on your `PATH`, such as `~/.local/bin`:
+1. Install `sshto` to `~/.local/bin`:
 
 ```bash
-mkdir -p ~/.local/bin
-cp sshto ~/.local/bin/sshto
-chmod +x ~/.local/bin/sshto
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install.sh | sh
 ```
 
-2. Open a new terminal and test:
+2. If `~/.local/bin` is not already on your `PATH`, add it:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+3. Test:
 
 ```bash
 sshto help

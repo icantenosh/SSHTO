@@ -34,9 +34,7 @@ sshto help
 ### Linux
 
 ```bash
-mkdir -p ~/.local/bin
-curl -L "https://github.com/icantenosh/SSHTO/raw/main/sshto" -o ~/.local/bin/sshto
-chmod +x ~/.local/bin/sshto
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install.sh | sh
 ```
 
 If `~/.local/bin` is not already on your `PATH`, add it:

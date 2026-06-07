@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added Linux `sshto` Bash version.
+- Added Linux pipe-to-shell installer.
 - Added Linux install and saved-data documentation.
 
 ## 1.0.0
