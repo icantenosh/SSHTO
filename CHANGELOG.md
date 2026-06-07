@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added Linux `sshto` Bash version.
+- Added Linux install and saved-data documentation.
+
 ## 1.0.0
 
 - Added standalone `sshto.exe`.

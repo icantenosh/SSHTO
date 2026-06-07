@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool"
+SERVERS_FILE="$APP_DIR/servers.json"
+
+ensure_store() {
+  mkdir -p "$APP_DIR"
+  if [[ ! -f "$SERVERS_FILE" ]]; then
+    printf '{}\n' > "$SERVERS_FILE"
+  fi
+}
+
+need_python() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    printf 'sshto: python3 is required for saved server data.\n' >&2
+    exit 1
+  fi
+}
+
+splash_screen() {
+  if [[ -t 1 ]]; then
+    printf '\033[38;5;48m'
+  fi
+  cat <<'EOF'
+   ________  ________  ___  ___  _________  ________
+  |\   ____\|\   ____\|\  \|\  \|\___   ___\\   __  \
+  \ \  \___|\ \  \___|\ \  \\\  \|___ \  \_\ \  \|\  \
+   \ \_____  \ \_____  \ \   __  \   \ \  \ \ \  \\\  \
+    \|____|\  \|____|\  \ \  \ \  \   \ \  \ \ \  \\\  \
+      ____\_\  \____\_\  \ \__\ \__\   \ \__\ \ \_______\
+     |\_________\_________\|__|\|__|    \|__|  \|_______|
+     \|_________\|_________|  << encrypted routes / fast shells >>
+EOF
+  if [[ -t 1 ]]; then
+    printf '\033[0m'
+  fi
+}
+
+help_text() {
+  splash_screen
+  cat <<'EOF'
+
+Quick SSH launcher for Linux.
+
+Commands:
+  sshto                                  Open the saved-server picker
+  sshto <nickname>                       Connect to a saved server
+  sshto add <nickname> <user@host>       Add or update a saved server
+  sshto add <nickname> <user@host> <port>  Add or update with a custom port
+  sshto keysetup <nickname>              Install your SSH key on a server
+  sshto list                             List saved servers
+  sshto ls                               Same as list
+  sshto remove <nickname>                Remove a saved server
+  sshto rm <nickname>                    Same as remove
+  sshto help                             Show help
+  sshto -h | --help                      Same as help
+EOF
+}
+
+server_json() {
+  need_python
+  ensure_store
+  python3 - "$SERVERS_FILE" "$@" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+command = sys.argv[2]
+
+try:
+    data = json.loads(path.read_text() or "{}")
+except json.JSONDecodeError:
+    print(f"sshto: invalid JSON in {path}", file=sys.stderr)
+    sys.exit(1)
+
+if command == "list":
+    for name in sorted(data):
+        item = data[name]
+        port = item.get("port", "22")
+        print(f"{name}\t{item.get('target', '')}\t{port}")
+elif command == "get":
+    name = sys.argv[3]
+    item = data.get(name)
+    if not item:
+        sys.exit(2)
+    print(item.get("target", ""))
+    print(item.get("port", "22"))
+elif command == "add":
+    name, target = sys.argv[3], sys.argv[4]
+    port = sys.argv[5] if len(sys.argv) > 5 else "22"
+    if "@" not in target:
+        print("sshto: target must look like user@host", file=sys.stderr)
+        sys.exit(1)
+    try:
+        port_int = int(port)
+        if not 1 <= port_int <= 65535:
+            raise ValueError
+    except ValueError:
+        print("sshto: port must be a number from 1 to 65535", file=sys.stderr)
+        sys.exit(1)
+    data[name] = {"target": target, "port": str(port_int)}
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+elif command == "remove":
+    name = sys.argv[3]
+    if name not in data:
+        sys.exit(2)
+    del data[name]
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+elif command == "names":
+    for name in sorted(data):
+        print(name)
+else:
+    sys.exit(1)
+PY
+}
+
+list_servers() {
+  local rows
+  rows="$(server_json list)"
+  if [[ -z "$rows" ]]; then
+    printf 'No saved servers yet. Add one with:\n  sshto add demo-server demo@server.test\n'
+    return
+  fi
+  printf '%-24s %-40s %s\n' "NICKNAME" "TARGET" "PORT"
+  printf '%-24s %-40s %s\n' "--------" "------" "----"
+  while IFS=$'\t' read -r name target port; do
+    printf '%-24s %-40s %s\n' "$name" "$target" "$port"
+  done <<< "$rows"
+}
+
+connect_server() {
+  local name="$1"
+  local info target port
+  if ! info="$(server_json get "$name")"; then
+    printf "sshto: no saved server named '%s'\n" "$name" >&2
+    exit 1
+  fi
+  target="$(sed -n '1p' <<< "$info")"
+  port="$(sed -n '2p' <<< "$info")"
+  exec ssh -p "$port" "$target"
+}
+
+keysetup() {
+  local name="$1"
+  local info target port pubkey
+  if ! info="$(server_json get "$name")"; then
+    printf "sshto: no saved server named '%s'\n" "$name" >&2
+    exit 1
+  fi
+  target="$(sed -n '1p' <<< "$info")"
+  port="$(sed -n '2p' <<< "$info")"
+
+  if [[ ! -f "$HOME/.ssh/id_ed25519.pub" && ! -f "$HOME/.ssh/id_rsa.pub" ]]; then
+    printf 'No SSH public key found. Creating an ed25519 key...\n'
+    ssh-keygen -t ed25519 -C "$USER@$(hostname)" -f "$HOME/.ssh/id_ed25519"
+  fi
+
+  pubkey="$HOME/.ssh/id_ed25519.pub"
+  [[ -f "$pubkey" ]] || pubkey="$HOME/.ssh/id_rsa.pub"
+
+  if command -v ssh-copy-id >/dev/null 2>&1; then
+    ssh-copy-id -p "$port" -i "$pubkey" "$target"
+  else
+    cat "$pubkey" | ssh -p "$port" "$target" 'read -r key; mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && grep -qxF "$key" ~/.ssh/authorized_keys || printf "%s\n" "$key" >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys'
+  fi
+}
+
+picker() {
+  local names count choice selected
+  mapfile -t names < <(server_json names)
+  count="${#names[@]}"
+  if [[ "$count" -eq 0 ]]; then
+    list_servers
+    exit 0
+  fi
+
+  splash_screen
+  printf '\n'
+  printf 'Saved servers:\n'
+  for i in "${!names[@]}"; do
+    printf '  %d) %s\n' "$((i + 1))" "${names[$i]}"
+  done
+  printf '\nChoose a number or nickname: '
+  read -r choice
+
+  case "$choice" in
+    q|quit|exit) exit 0 ;;
+    help|-h|--help) help_text; exit 0 ;;
+    list|ls) list_servers; exit 0 ;;
+  esac
+
+  if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= count )); then
+    selected="${names[$((choice - 1))]}"
+  else
+    selected="$choice"
+  fi
+  connect_server "$selected"
+}
+
+main() {
+  local command="${1:-}"
+  case "$command" in
+    "") picker ;;
+    help|-h|--help) help_text ;;
+    list|ls) list_servers ;;
+    add)
+      if [[ $# -lt 3 || $# -gt 4 ]]; then
+        printf 'Usage: sshto add <nickname> <user@host> [port]\n' >&2
+        exit 1
+      fi
+      server_json add "$2" "$3" "${4:-22}"
+      printf "Saved '%s'.\n" "$2"
+      ;;
+    remove|rm)
+      if [[ $# -ne 2 ]]; then
+        printf 'Usage: sshto remove <nickname>\n' >&2
+        exit 1
+      fi
+      if server_json remove "$2"; then
+        printf "Removed '%s'.\n" "$2"
+      else
+        printf "sshto: no saved server named '%s'\n" "$2" >&2
+        exit 1
+      fi
+      ;;
+    keysetup)
+      if [[ $# -ne 2 ]]; then
+        printf 'Usage: sshto keysetup <nickname>\n' >&2
+        exit 1
+      fi
+      keysetup "$2"
+      ;;
+    *) connect_server "$command" ;;
+  esac
+}
+
+main "$@"

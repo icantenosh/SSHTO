@@ -4,32 +4,25 @@
 
 # SSHTO
 
-Quick SSH launcher for Windows.
+Quick SSH launcher for Windows and Linux.
 
-`sshto.exe` lets you save SSH server nicknames, list them, connect quickly, and set up SSH key login from the command line.
+`sshto.exe` on Windows and `sshto` on Linux let you save SSH server nicknames, list them, connect quickly, and set up SSH key login from the command line.
 
-## Download
+## Install
 
-For Windows PowerShell:
+### Windows
 
-Download only, to any folder you choose:
+Install to `C:\Tools`:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/raw/main/sshto.exe" -OutFile "C:\REPLACE-WITH-YOUR-FOLDER\sshto.exe"
+New-Item -ItemType Directory -Force "C:\Tools"
+Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/raw/main/sshto.exe" -OutFile "C:\Tools\sshto.exe"
 ```
 
-Add the folder where you installed `sshto.exe` to your user `PATH` so `sshto` works from any folder.
-
-Example for `C:\Tools`:
+Add `C:\Tools` to your user `PATH`:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Tools", "User")
-```
-
-Quick install to `C:\Tools`:
-
-```powershell
-New-Item -ItemType Directory -Force "C:\Tools"; Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/raw/main/sshto.exe" -OutFile "C:\Tools\sshto.exe"
 ```
 
 Restart PowerShell, then test it:
@@ -38,7 +31,26 @@ Restart PowerShell, then test it:
 sshto help
 ```
 
-Keep `sshto.exe` directly inside the folder you add to `PATH`.
+### Linux
+
+```bash
+mkdir -p ~/.local/bin
+curl -L "https://github.com/icantenosh/SSHTO/raw/main/sshto" -o ~/.local/bin/sshto
+chmod +x ~/.local/bin/sshto
+```
+
+If `~/.local/bin` is not already on your `PATH`, add it:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Test it:
+
+```bash
+sshto help
+```
 
 ## Commands
 
@@ -68,7 +80,7 @@ sshto list
 
 ## Saved Data
 
-Server data is stored per Windows user at:
+On Windows, server data is stored per Windows user at:
 
 ```bat
 %APPDATA%\ssh-tool\servers.json
@@ -76,8 +88,17 @@ Server data is stored per Windows user at:
 
 Saved passwords are encrypted with Windows DPAPI for the current Windows user. SSH key login is recommended.
 
+On Linux, server data is stored at:
+
+```bash
+${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool/servers.json
+```
+
+The Linux version does not store passwords. Use `sshto keysetup <nickname>` to install your SSH public key.
+
 ## Notes
 
 - `sshto.exe` requires Windows PowerShell and Windows OpenSSH.
+- `sshto` for Linux requires Bash, Python 3, and OpenSSH.
 - Password auto-login is only possible if `plink.exe` is installed and available on `PATH`.
 - `keysetup` is the preferred way to avoid typing server passwords.

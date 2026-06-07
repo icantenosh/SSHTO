@@ -1,3 +1,5 @@
 *.exe binary
+sshto text eol=lf
+CHECKSUMS.txt text eol=lf
 *.md text eol=lf
 LICENSE text eol=lf
