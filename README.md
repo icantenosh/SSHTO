@@ -12,17 +12,10 @@ Quick SSH launcher for Windows and Linux.
 
 ### Windows
 
-Install to `C:\Tools`:
+Install from PowerShell:
 
 ```powershell
-New-Item -ItemType Directory -Force "C:\Tools"
-Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/raw/main/sshto.exe" -OutFile "C:\Tools\sshto.exe"
-```
-
-Add `C:\Tools` to your user `PATH`:
-
-```powershell
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\Tools", "User")
+irm https://github.com/icantenosh/SSHTO/raw/main/install.ps1 | iex
 ```
 
 Restart PowerShell, then test it:
