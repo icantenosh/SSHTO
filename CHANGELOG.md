@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added standalone Windows GUI as `sshto-gui.exe`.
+- Added GUI server management for add, edit, remove, search, connect, and SSH key setup.
+- Added internal GUI key setup without opening an external terminal.
+- Added persistent GUI themes.
 - Added Linux `sshto` Bash version.
 - Added Linux pipe-to-shell installer.
 - Added Linux install and saved-data documentation.

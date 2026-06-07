@@ -60,6 +60,50 @@ sshto -h                           Same as help
 sshto --help                       Same as help
 ```
 
+## GUI
+
+The Windows GUI is available as one standalone file:
+
+```text
+sshto-gui.exe
+```
+
+Download `sshto-gui.exe`, place it anywhere, and run it.
+
+Install it from PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "C:\Tools"
+Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/releases/latest/download/sshto-gui.exe" -OutFile "C:\Tools\sshto-gui.exe"
+```
+
+The GUI uses the same saved server file as the command-line tool and can add,
+edit, remove, connect, and run SSH key setup. Server data stays at:
+
+```bat
+%APPDATA%\ssh-tool\servers.json
+```
+
+Theme selection is persistent and saved per Windows user.
+
+### GUI Themes
+
+| Deep Green | Neon Violet |
+| --- | --- |
+| <img src="docs/screenshots/deep-green.png" alt="SSHTO GUI Deep Green theme"> | <img src="docs/screenshots/neon-violet.png" alt="SSHTO GUI Neon Violet theme"> |
+
+| Amber CRT | Mocha |
+| --- | --- |
+| <img src="docs/screenshots/amber-crt.png" alt="SSHTO GUI Amber CRT theme"> | <img src="docs/screenshots/mocha.png" alt="SSHTO GUI Mocha theme"> |
+
+| Light | Midnight Blue |
+| --- | --- |
+| <img src="docs/screenshots/light.png" alt="SSHTO GUI Light theme"> | <img src="docs/screenshots/midnight-blue.png" alt="SSHTO GUI Midnight Blue theme"> |
+
+| Dark |
+| --- |
+| <img src="docs/screenshots/dark.png" alt="SSHTO GUI Dark theme"> |
+
 ## Examples
 
 ```bat
