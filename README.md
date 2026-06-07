@@ -37,13 +37,6 @@ sshto help
 curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install.sh | sh
 ```
 
-If `~/.local/bin` is not already on your `PATH`, add it:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
 Test it:
 
 ```bash
