@@ -73,8 +73,7 @@ Download `sshto-gui.exe`, place it anywhere, and run it.
 Install it from PowerShell:
 
 ```powershell
-New-Item -ItemType Directory -Force "C:\Tools"
-Invoke-WebRequest -Uri "https://github.com/icantenosh/SSHTO/releases/latest/download/sshto-gui.exe" -OutFile "C:\Tools\sshto-gui.exe"
+irm https://github.com/icantenosh/SSHTO/raw/main/install-gui.ps1 | iex
 ```
 
 The GUI uses the same saved server file as the command-line tool and can add,
