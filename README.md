@@ -55,6 +55,8 @@ sshto --help                       Same as help
 
 ## GUI
 
+### Windows
+
 The Windows GUI is available as one standalone file:
 
 ```text
@@ -77,6 +79,30 @@ edit, remove, connect, and run SSH key setup. Server data stays at:
 ```
 
 Theme selection is persistent and saved per Windows user.
+
+### Linux
+
+Install the Linux GUI script to `~/.local/bin`:
+
+```bash
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
+```
+
+Run it:
+
+```bash
+sshto-gui
+```
+
+The Linux GUI uses the same saved server file as the Linux command-line tool:
+
+```bash
+${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool/servers.json
+```
+
+It can add, edit, remove, search, connect, and run SSH key setup. Connecting opens
+your saved server in a terminal emulator such as `x-terminal-emulator`,
+`gnome-terminal`, `konsole`, `xfce4-terminal`, or `xterm`.
 
 ### GUI Themes
 
@@ -127,5 +153,6 @@ The Linux version does not store passwords. Use `sshto keysetup <nickname>` to i
 
 - `sshto.exe` requires Windows PowerShell and Windows OpenSSH.
 - `sshto` for Linux requires Bash, Python 3, and OpenSSH.
+- `sshto-gui` for Linux requires Python 3, Python Tk support, OpenSSH, and a terminal emulator.
 - Password auto-login is only possible if `plink.exe` is installed and available on `PATH`.
 - `keysetup` is the preferred way to avoid typing server passwords.

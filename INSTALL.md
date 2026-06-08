@@ -62,3 +62,24 @@ sshto demo-server
 ```
 
 Linux saved server data lives at `${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool/servers.json`.
+
+## Linux GUI
+
+Install `sshto-gui` to `~/.local/bin`:
+
+```bash
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
+```
+
+Run it:
+
+```bash
+sshto-gui
+```
+
+The Linux GUI needs Python 3, Python Tk support, OpenSSH, and a terminal emulator.
+On Debian or Ubuntu, Tk support is usually available with:
+
+```bash
+sudo apt install python3-tk
+```

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Linux `sshto-gui` Python/Tk source.
+- Added Linux GUI installer script.
 - Added standalone Windows GUI as `sshto-gui.exe`.
 - Added GUI server management for add, edit, remove, search, connect, and SSH key setup.
 - Added internal GUI key setup without opening an external terminal.

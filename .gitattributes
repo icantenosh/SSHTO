@@ -1,6 +1,8 @@
 *.exe binary
 install.sh text eol=lf
+install-gui.sh text eol=lf
 sshto text eol=lf
+sshto-gui text eol=lf
 CHECKSUMS.txt text eol=lf
 *.md text eol=lf
 LICENSE text eol=lf

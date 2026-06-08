@@ -1,0 +1,509 @@
+#!/usr/bin/env python3
+"""Cross-platform Tk GUI for SSHTO."""
+
+from __future__ import annotations
+
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import tkinter as tk
+from pathlib import Path
+from tkinter import messagebox, simpledialog, ttk
+
+
+APP_NAME = "SSHTO"
+CONFIG_NAME = "ssh-tool"
+SERVER_FILE_NAME = "servers.json"
+THEME_FILE_NAME = "gui-theme.json"
+
+
+THEMES = {
+    "Deep Green": {
+        "bg": "#07130d",
+        "panel": "#0d2117",
+        "panel_alt": "#123222",
+        "entry": "#020b07",
+        "row_odd": "#091a11",
+        "ink": "#d8ffe6",
+        "muted": "#75d79c",
+        "line": "#1d7041",
+        "accent": "#00ff7f",
+        "accent_active": "#42ff9e",
+        "button_active": "#17492f",
+        "button_pressed": "#0a2618",
+        "select": "#145f38",
+    },
+    "Neon Violet": {
+        "bg": "#10091f",
+        "panel": "#1b1130",
+        "panel_alt": "#241541",
+        "entry": "#090412",
+        "row_odd": "#140b26",
+        "ink": "#f3eaff",
+        "muted": "#bca7ff",
+        "line": "#7b49ff",
+        "accent": "#dd55ff",
+        "accent_active": "#f08bff",
+        "button_active": "#39215f",
+        "button_pressed": "#1f1236",
+        "select": "#4b2371",
+    },
+    "Amber CRT": {
+        "bg": "#0f0a00",
+        "panel": "#1b1100",
+        "panel_alt": "#251800",
+        "entry": "#050300",
+        "row_odd": "#150e00",
+        "ink": "#ffe0a3",
+        "muted": "#d8a647",
+        "line": "#b87400",
+        "accent": "#ffb000",
+        "accent_active": "#ffc84a",
+        "button_active": "#3b2600",
+        "button_pressed": "#1c1200",
+        "select": "#5f3d00",
+    },
+    "Mocha": {
+        "bg": "#15100d",
+        "panel": "#211915",
+        "panel_alt": "#2b211b",
+        "entry": "#0b0807",
+        "row_odd": "#1a1411",
+        "ink": "#f1dfd1",
+        "muted": "#c9a58d",
+        "line": "#8d654d",
+        "accent": "#e69b5a",
+        "accent_active": "#ffb775",
+        "button_active": "#3a2b22",
+        "button_pressed": "#1c1511",
+        "select": "#61412f",
+    },
+    "Light": {
+        "bg": "#eef2f5",
+        "panel": "#ffffff",
+        "panel_alt": "#e2e8ef",
+        "entry": "#ffffff",
+        "row_odd": "#f6f8fa",
+        "ink": "#17212b",
+        "muted": "#52616f",
+        "line": "#8aa0b6",
+        "accent": "#006d77",
+        "accent_active": "#008891",
+        "button_active": "#d6e4ec",
+        "button_pressed": "#c4d4df",
+        "select": "#b7d7df",
+    },
+    "Midnight Blue": {
+        "bg": "#07111f",
+        "panel": "#0d1b2d",
+        "panel_alt": "#142943",
+        "entry": "#030914",
+        "row_odd": "#0a1627",
+        "ink": "#dbeaff",
+        "muted": "#8bb8e8",
+        "line": "#2d6da3",
+        "accent": "#4cc9f0",
+        "accent_active": "#77dcff",
+        "button_active": "#1d3a5d",
+        "button_pressed": "#0c1b2e",
+        "select": "#1b4f78",
+    },
+    "Dark": {
+        "bg": "#0d0f12",
+        "panel": "#171a1f",
+        "panel_alt": "#22262d",
+        "entry": "#080a0d",
+        "row_odd": "#111419",
+        "ink": "#e7edf5",
+        "muted": "#9aa8b8",
+        "line": "#4c5968",
+        "accent": "#7dd3fc",
+        "accent_active": "#a5e3ff",
+        "button_active": "#2c333d",
+        "button_pressed": "#15191f",
+        "select": "#334155",
+    },
+}
+
+
+def config_dir() -> Path:
+    system = platform.system()
+    if system == "Windows":
+        base = os.environ.get("APPDATA")
+        return Path(base) / CONFIG_NAME if base else Path.home() / CONFIG_NAME
+    if system == "Darwin":
+        return Path.home() / "Library" / "Application Support" / CONFIG_NAME
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / CONFIG_NAME
+
+
+def load_json(path: Path, default):
+    try:
+        if not path.exists():
+            return default
+        return json.loads(path.read_text(encoding="utf-8") or "{}")
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Could not read {path}: {exc}") from exc
+
+
+def write_json(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def valid_port(value: str) -> bool:
+    try:
+        port = int(value)
+    except ValueError:
+        return False
+    return 1 <= port <= 65535
+
+
+def terminal_command(command: list[str]) -> list[str] | None:
+    system = platform.system()
+    if system == "Windows":
+        return ["cmd", "/k", *command]
+    if system == "Darwin" and shutil.which("osascript"):
+        script = " ".join(command)
+        return ["osascript", "-e", f'tell app "Terminal" to do script "{script}"']
+
+    joined = " ".join(sh_quote(part) for part in command)
+    candidates = [
+        ("x-terminal-emulator", ["x-terminal-emulator", "-e", *command]),
+        ("gnome-terminal", ["gnome-terminal", "--", *command]),
+        ("konsole", ["konsole", "-e", *command]),
+        ("xfce4-terminal", ["xfce4-terminal", "-e", joined]),
+        ("mate-terminal", ["mate-terminal", "-e", joined]),
+        ("lxterminal", ["lxterminal", "-e", joined]),
+        ("xterm", ["xterm", "-e", *command]),
+    ]
+    for executable, full_command in candidates:
+        if shutil.which(executable):
+            return full_command
+    return None
+
+
+def sh_quote(value: str) -> str:
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+class ServerDialog(simpledialog.Dialog):
+    def __init__(self, parent, title: str, values: dict[str, str] | None = None):
+        self.values = values or {}
+        self.result = None
+        super().__init__(parent, title)
+
+    def body(self, master):
+        self.resizable(False, False)
+        ttk.Label(master, text="Nickname").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Label(master, text="Target").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        ttk.Label(master, text="Port").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=6)
+
+        self.name_var = tk.StringVar(value=self.values.get("name", ""))
+        self.target_var = tk.StringVar(value=self.values.get("target", ""))
+        self.port_var = tk.StringVar(value=self.values.get("port", "22"))
+
+        self.name_entry = ttk.Entry(master, textvariable=self.name_var, width=34)
+        self.target_entry = ttk.Entry(master, textvariable=self.target_var, width=34)
+        self.port_entry = ttk.Entry(master, textvariable=self.port_var, width=10)
+        self.name_entry.grid(row=0, column=1, sticky="ew", pady=6)
+        self.target_entry.grid(row=1, column=1, sticky="ew", pady=6)
+        self.port_entry.grid(row=2, column=1, sticky="w", pady=6)
+        return self.name_entry
+
+    def validate(self):
+        name = self.name_var.get().strip()
+        target = self.target_var.get().strip()
+        port = self.port_var.get().strip() or "22"
+        if not name:
+            messagebox.showerror(APP_NAME, "Nickname is required.", parent=self)
+            return False
+        if not target or "@" not in target:
+            messagebox.showerror(APP_NAME, "Target must look like user@host.", parent=self)
+            return False
+        if not valid_port(port):
+            messagebox.showerror(APP_NAME, "Port must be a number from 1 to 65535.", parent=self)
+            return False
+        self.result = {"name": name, "target": target, "port": str(int(port))}
+        return True
+
+
+class SshtoGui:
+    def __init__(self, root: tk.Tk):
+        self.root = root
+        self.app_dir = config_dir()
+        self.servers_path = self.app_dir / SERVER_FILE_NAME
+        self.theme_path = self.app_dir / THEME_FILE_NAME
+        self.servers: dict[str, dict[str, str]] = {}
+        self.search_var = tk.StringVar()
+        self.theme_var = tk.StringVar(value=self.load_theme())
+        self.status_var = tk.StringVar(value="Ready")
+
+        root.title("SSHTO")
+        root.minsize(780, 460)
+        self.build_ui()
+        self.reload()
+
+    def load_theme(self) -> str:
+        try:
+            theme = load_json(config_dir() / THEME_FILE_NAME, {}).get("theme", "Deep Green")
+        except RuntimeError:
+            theme = "Deep Green"
+        return theme if theme in THEMES else "Deep Green"
+
+    def palette(self):
+        return THEMES.get(self.theme_var.get(), THEMES["Deep Green"])
+
+    def configure_styles(self) -> None:
+        colors = self.palette()
+        style = ttk.Style(self.root)
+        if "clam" in style.theme_names():
+            style.theme_use("clam")
+        mono = ("Consolas", 10)
+        label_font = ("Segoe UI", 10)
+
+        style.configure(".", background=colors["bg"], foreground=colors["ink"], fieldbackground=colors["entry"], font=label_font)
+        style.configure("Cyber.TFrame", background=colors["bg"])
+        style.configure("Panel.TFrame", background=colors["panel"])
+        style.configure("TLabel", background=colors["panel"], foreground=colors["ink"])
+        style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=("Consolas", 9, "bold"))
+        style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9))
+        style.configure(
+            "TButton",
+            background=colors["panel_alt"],
+            foreground=colors["ink"],
+            bordercolor=colors["line"],
+            lightcolor=colors["panel_alt"],
+            darkcolor=colors["panel_alt"],
+            focusthickness=1,
+            focuscolor=colors["accent"],
+            padding=(12, 7),
+            font=("Consolas", 9, "bold"),
+        )
+        style.map(
+            "TButton",
+            background=[("active", colors["button_active"]), ("pressed", colors["button_pressed"])],
+            foreground=[("active", colors["accent"]), ("pressed", colors["accent"])],
+            bordercolor=[("focus", colors["accent"]), ("active", colors["accent"])],
+        )
+        style.configure("Accent.TButton", background=colors["accent"], foreground=colors["bg"])
+        style.map("Accent.TButton", background=[("active", colors["accent_active"]), ("pressed", colors["accent"])])
+        style.configure(
+            "Cyber.TEntry",
+            fieldbackground=colors["entry"],
+            foreground=colors["accent"],
+            insertcolor=colors["accent"],
+            bordercolor=colors["line"],
+            lightcolor=colors["line"],
+            darkcolor=colors["line"],
+            padding=(8, 6),
+            font=mono,
+        )
+        style.configure(
+            "Cyber.TCombobox",
+            fieldbackground=colors["entry"],
+            background=colors["panel_alt"],
+            foreground=colors["accent"],
+            arrowcolor=colors["accent"],
+            bordercolor=colors["line"],
+            lightcolor=colors["line"],
+            darkcolor=colors["line"],
+            padding=(7, 5),
+            font=mono,
+        )
+        style.map(
+            "Cyber.TCombobox",
+            fieldbackground=[("readonly", colors["entry"])],
+            foreground=[("readonly", colors["accent"])],
+            bordercolor=[("readonly", colors["line"])],
+        )
+        style.configure("Treeview", background=colors["entry"], fieldbackground=colors["entry"], foreground=colors["ink"], borderwidth=0, rowheight=31, font=mono)
+        style.configure("Treeview.Heading", background=colors["panel_alt"], foreground=colors["accent"], bordercolor=colors["line"], relief="flat", font=("Consolas", 10, "bold"))
+        style.map("Treeview", background=[("selected", colors["select"])], foreground=[("selected", colors["accent"])])
+        style.configure("Vertical.TScrollbar", background=colors["panel_alt"], troughcolor=colors["entry"], bordercolor=colors["line"], arrowcolor=colors["accent"])
+
+    def build_ui(self) -> None:
+        self.configure_styles()
+        self.root.configure(bg=self.palette()["bg"])
+        main = ttk.Frame(self.root, padding=16, style="Cyber.TFrame")
+        main.pack(fill=tk.BOTH, expand=True)
+
+        toolbar = ttk.Frame(main, style="Cyber.TFrame")
+        toolbar.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Button(toolbar, text="CONNECT", style="Accent.TButton", command=self.connect_selected).pack(side=tk.LEFT)
+        ttk.Button(toolbar, text="KEY SETUP", command=self.keysetup_selected).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(toolbar, text="ADD", command=self.add_server).pack(side=tk.LEFT, padx=(18, 0))
+        ttk.Button(toolbar, text="EDIT", command=self.edit_selected).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(toolbar, text="REMOVE", command=self.remove_selected).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(toolbar, text="REFRESH", command=self.reload).pack(side=tk.LEFT, padx=(18, 0))
+
+        theme_box = ttk.Frame(toolbar, style="Cyber.TFrame")
+        theme_box.pack(side=tk.RIGHT, padx=(12, 0))
+        ttk.Label(theme_box, text="THEME", style="Muted.TLabel").pack(side=tk.LEFT, padx=(0, 8))
+        theme_picker = ttk.Combobox(theme_box, textvariable=self.theme_var, values=list(THEMES), state="readonly", width=14, style="Cyber.TCombobox")
+        theme_picker.pack(side=tk.LEFT)
+        theme_picker.bind("<<ComboboxSelected>>", lambda _event: self.change_theme())
+        theme_picker.bind("<FocusIn>", lambda event: event.widget.after_idle(event.widget.selection_clear), add="+")
+
+        search_box = ttk.Frame(toolbar, style="Cyber.TFrame")
+        search_box.pack(side=tk.RIGHT)
+        ttk.Label(search_box, text="SCAN", style="Muted.TLabel").pack(side=tk.LEFT, padx=(0, 8))
+        search_entry = ttk.Entry(search_box, textvariable=self.search_var, width=24, style="Cyber.TEntry")
+        search_entry.pack(side=tk.LEFT)
+        self.search_var.trace_add("write", lambda *_args: self.populate())
+
+        table_frame = ttk.Frame(main, style="Panel.TFrame", padding=1)
+        table_frame.pack(fill=tk.BOTH, expand=True)
+        columns = ("nickname", "target", "port")
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", selectmode="browse")
+        self.tree.heading("nickname", text="Nickname")
+        self.tree.heading("target", text="Target")
+        self.tree.heading("port", text="Port")
+        self.tree.column("nickname", width=190, minwidth=130, anchor="w")
+        self.tree.column("target", width=390, minwidth=220, anchor="w")
+        self.tree.column("port", width=80, minwidth=70, anchor="center")
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview, style="Vertical.TScrollbar")
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        self.tree.bind("<Double-1>", lambda _event: self.connect_selected())
+        self.tree.bind("<Return>", lambda _event: self.connect_selected())
+        self.tree.bind("<Delete>", lambda _event: self.remove_selected())
+
+        status = ttk.Label(main, textvariable=self.status_var, style="Status.TLabel", anchor="w")
+        status.pack(fill=tk.X, pady=(10, 0))
+
+    def change_theme(self) -> None:
+        write_json(self.theme_path, {"theme": self.theme_var.get()})
+        self.configure_styles()
+        self.root.configure(bg=self.palette()["bg"])
+        self.populate()
+        self.status_var.set(f"Theme: {self.theme_var.get()}")
+
+    def reload(self) -> None:
+        self.app_dir.mkdir(parents=True, exist_ok=True)
+        if not self.servers_path.exists():
+            write_json(self.servers_path, {})
+        try:
+            data = load_json(self.servers_path, {})
+        except RuntimeError as exc:
+            messagebox.showerror(APP_NAME, str(exc), parent=self.root)
+            data = {}
+        self.servers = {name: value for name, value in data.items() if isinstance(value, dict)}
+        self.populate()
+        self.status_var.set(f"Loaded {len(self.servers)} saved server(s) from {self.servers_path}")
+
+    def save_servers(self) -> None:
+        write_json(self.servers_path, self.servers)
+        self.populate()
+
+    def populate(self) -> None:
+        colors = self.palette()
+        self.tree.tag_configure("even", background=colors["entry"], foreground=colors["ink"])
+        self.tree.tag_configure("odd", background=colors["row_odd"], foreground=colors["ink"])
+        query = self.search_var.get().strip().lower()
+        selected = self.selected_name()
+        self.tree.delete(*self.tree.get_children())
+        for index, name in enumerate(sorted(self.servers)):
+            item = self.servers[name]
+            target = str(item.get("target", ""))
+            port = str(item.get("port", "22"))
+            haystack = f"{name} {target} {port}".lower()
+            if query and query not in haystack:
+                continue
+            tag = "even" if index % 2 == 0 else "odd"
+            self.tree.insert("", tk.END, iid=name, values=(name, target, port), tags=(tag,))
+        if selected and self.tree.exists(selected):
+            self.tree.selection_set(selected)
+
+    def selected_name(self) -> str | None:
+        selection = self.tree.selection() if hasattr(self, "tree") else ()
+        return selection[0] if selection else None
+
+    def require_selection(self) -> str | None:
+        name = self.selected_name()
+        if not name:
+            messagebox.showinfo(APP_NAME, "Select a saved server first.", parent=self.root)
+            return None
+        return name
+
+    def add_server(self) -> None:
+        dialog = ServerDialog(self.root, "Add Server")
+        if not dialog.result:
+            return
+        name = dialog.result.pop("name")
+        self.servers[name] = dialog.result
+        self.save_servers()
+        self.tree.selection_set(name)
+        self.status_var.set(f"Saved {name}")
+
+    def edit_selected(self) -> None:
+        name = self.require_selection()
+        if not name:
+            return
+        item = self.servers[name]
+        values = {"name": name, "target": str(item.get("target", "")), "port": str(item.get("port", "22"))}
+        dialog = ServerDialog(self.root, "Edit Server", values)
+        if not dialog.result:
+            return
+        new_name = dialog.result.pop("name")
+        if new_name != name:
+            self.servers.pop(name, None)
+        self.servers[new_name] = dialog.result
+        self.save_servers()
+        self.tree.selection_set(new_name)
+        self.status_var.set(f"Updated {new_name}")
+
+    def remove_selected(self) -> None:
+        name = self.require_selection()
+        if not name:
+            return
+        if not messagebox.askyesno(APP_NAME, f"Remove '{name}'?", parent=self.root):
+            return
+        self.servers.pop(name, None)
+        self.save_servers()
+        self.status_var.set(f"Removed {name}")
+
+    def connect_selected(self) -> None:
+        name = self.require_selection()
+        if name:
+            self.run_in_terminal(["ssh", "-p", str(self.servers[name].get("port", "22")), str(self.servers[name].get("target", ""))])
+
+    def keysetup_selected(self) -> None:
+        name = self.require_selection()
+        if not name:
+            return
+        if shutil.which("sshto"):
+            self.run_in_terminal(["sshto", "keysetup", name])
+        else:
+            messagebox.showinfo(APP_NAME, "Install the sshto CLI first, then run key setup again.", parent=self.root)
+
+    def run_in_terminal(self, command: list[str]) -> None:
+        full_command = terminal_command(command)
+        if not full_command:
+            messagebox.showerror(APP_NAME, "No supported terminal emulator was found.\n\nRun this manually:\n" + " ".join(command), parent=self.root)
+            return
+        try:
+            subprocess.Popen(full_command)
+            self.status_var.set("Started: " + " ".join(command))
+        except OSError as exc:
+            messagebox.showerror(APP_NAME, f"Could not start command:\n{exc}", parent=self.root)
+
+
+def main() -> int:
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        print(f"sshto-gui: could not start Tk: {exc}", file=sys.stderr)
+        return 1
+    SshtoGui(root)
+    root.mainloop()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
