@@ -430,7 +430,7 @@ class SshtoGui:
         style.configure("DialogAccent.TLabel", background=colors["panel"], foreground=colors["accent"], font=label_font)
         style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=mono_small_bold)
         style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=mono_small)
-        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=mono_small_bold, justify="center")
+        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=mono_small_bold, justify="left")
         style.configure(
             "TButton",
             background=colors["panel_alt"],
@@ -491,8 +491,8 @@ class SshtoGui:
         main = ttk.Frame(self.root, padding=16, style="Cyber.TFrame")
         main.pack(fill=tk.BOTH, expand=True)
 
-        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel", anchor="center", justify="center")
-        self.splash.pack(fill=tk.X, pady=(0, 12))
+        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel", anchor="center", justify="left")
+        self.splash.pack(anchor=tk.CENTER, pady=(0, 12))
 
         toolbar = ttk.Frame(main, style="Cyber.TFrame")
         toolbar.pack(fill=tk.X, pady=(0, 10))
