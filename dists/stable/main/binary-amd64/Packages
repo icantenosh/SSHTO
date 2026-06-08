@@ -1,13 +1,13 @@
 Package: sshto-gui
-Version: 1.2.3
+Version: 1.2.4
 Architecture: amd64
 Maintainer: icantenosh
 Depends: openssh-client, xterm | x-terminal-emulator
-Filename: pool/main/s/sshto-gui/sshto-gui_1.2.3_amd64.deb
-Size: 37314256
-MD5sum: 0186239cb6c659a503caf802f3786d1a
-SHA1: 1a245c20f09713e5cce8bafb54a92a5f07e64e7b
-SHA256: 751c5fd6aedf06a0da468b84ea31415be58ded40dffd0de7b68f72d837840b82
+Filename: pool/main/s/sshto-gui/sshto-gui_1.2.4_amd64.deb
+Size: 37312630
+MD5sum: ec2f768cfa7f63ca73148537ac07dc8c
+SHA1: 343fd2a9fbacefbf9734dd80fcd268b5c63629f6
+SHA256: dec414c6f9ef4ab68748438263b1899a5205c77a0cb23567dbd5c5e156bab975
 Section: net
 Priority: optional
 Description: SSHTO graphical SSH launcher
