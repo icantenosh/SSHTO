@@ -13,7 +13,7 @@ import tkinter as tk
 from getpass import getuser
 from socket import gethostname
 from pathlib import Path
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import ttk
 
 try:
     import paramiko
@@ -218,14 +218,15 @@ def terminal_command(command: list[str]) -> list[str] | None:
         return ["osascript", "-e", f'tell app "Terminal" to do script "{script}"']
 
     joined = " ".join(sh_quote(part) for part in command)
+    shell_line = f"{joined}; status=$?; printf '\\nSSHTO session ended with status %s. Press Enter to close...' \"$status\"; read _"
     candidates = [
-        ("x-terminal-emulator", ["x-terminal-emulator", "-e", *command]),
-        ("gnome-terminal", ["gnome-terminal", "--", *command]),
-        ("konsole", ["konsole", "-e", *command]),
-        ("xfce4-terminal", ["xfce4-terminal", "-e", joined]),
-        ("mate-terminal", ["mate-terminal", "-e", joined]),
-        ("lxterminal", ["lxterminal", "-e", joined]),
-        ("xterm", ["xterm", "-e", *command]),
+        ("gnome-terminal", ["gnome-terminal", "--", "sh", "-lc", shell_line]),
+        ("konsole", ["konsole", "-e", "sh", "-lc", shell_line]),
+        ("xfce4-terminal", ["xfce4-terminal", "-e", f"sh -lc {sh_quote(shell_line)}"]),
+        ("mate-terminal", ["mate-terminal", "-e", f"sh -lc {sh_quote(shell_line)}"]),
+        ("lxterminal", ["lxterminal", "-e", f"sh -lc {sh_quote(shell_line)}"]),
+        ("xterm", ["xterm", "-e", "sh", "-lc", shell_line]),
+        ("x-terminal-emulator", ["x-terminal-emulator", "-e", "sh", "-lc", shell_line]),
     ]
     for executable, full_command in candidates:
         if shutil.which(executable):
@@ -237,14 +238,56 @@ def sh_quote(value: str) -> str:
     return "'" + value.replace("'", "'\"'\"'") + "'"
 
 
-class ServerDialog(simpledialog.Dialog):
-    def __init__(self, parent, title: str, values: dict[str, str] | None = None):
-        self.values = values or {}
+class ThemedModal(tk.Toplevel):
+    def __init__(self, app: "SshtoGui", title: str):
+        super().__init__(app.root)
+        self.app = app
+        self.colors = app.palette()
         self.result = None
-        super().__init__(parent, title)
-
-    def body(self, master):
+        self.title(title)
+        self.configure(bg=self.colors["bg"])
         self.resizable(False, False)
+        self.transient(app.root)
+        self.grab_set()
+
+        self.content = ttk.Frame(self, padding=16, style="Panel.TFrame")
+        self.content.pack(fill=tk.BOTH, expand=True)
+        self.bind("<Escape>", lambda _event: self.cancel())
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+
+    def show(self):
+        self.update_idletasks()
+        parent_x = self.app.root.winfo_rootx()
+        parent_y = self.app.root.winfo_rooty()
+        parent_w = self.app.root.winfo_width()
+        parent_h = self.app.root.winfo_height()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = parent_x + max((parent_w - width) // 2, 0)
+        y = parent_y + max((parent_h - height) // 2, 0)
+        self.geometry(f"+{x}+{y}")
+        self.wait_window()
+        return self.result
+
+    def button_row(self, ok_text="OK"):
+        row = ttk.Frame(self.content, style="Panel.TFrame")
+        row.grid(sticky="e", pady=(14, 0), columnspan=2)
+        ttk.Button(row, text=ok_text, style="Accent.TButton", command=self.ok).pack(side=tk.RIGHT)
+        ttk.Button(row, text="CANCEL", command=self.cancel).pack(side=tk.RIGHT, padx=(0, 8))
+
+    def cancel(self):
+        self.result = None
+        self.destroy()
+
+
+class ServerDialog(ThemedModal):
+    def __init__(self, app: "SshtoGui", title: str, values: dict[str, str] | None = None):
+        self.values = values or {}
+        super().__init__(app, title)
+        self.build()
+
+    def build(self):
+        master = self.content
         ttk.Label(master, text="Nickname").grid(row=0, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Label(master, text="Target").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
         ttk.Label(master, text="Port").grid(row=2, column=0, sticky="w", padx=(0, 10), pady=6)
@@ -253,29 +296,82 @@ class ServerDialog(simpledialog.Dialog):
         self.target_var = tk.StringVar(value=self.values.get("target", ""))
         self.port_var = tk.StringVar(value=self.values.get("port", "22"))
 
-        self.name_entry = ttk.Entry(master, textvariable=self.name_var, width=34)
-        self.target_entry = ttk.Entry(master, textvariable=self.target_var, width=34)
-        self.port_entry = ttk.Entry(master, textvariable=self.port_var, width=10)
+        self.name_entry = ttk.Entry(master, textvariable=self.name_var, width=34, style="Cyber.TEntry")
+        self.target_entry = ttk.Entry(master, textvariable=self.target_var, width=34, style="Cyber.TEntry")
+        self.port_entry = ttk.Entry(master, textvariable=self.port_var, width=10, style="Cyber.TEntry")
         self.name_entry.grid(row=0, column=1, sticky="ew", pady=6)
         self.target_entry.grid(row=1, column=1, sticky="ew", pady=6)
         self.port_entry.grid(row=2, column=1, sticky="w", pady=6)
-        return self.name_entry
+        self.button_row("SAVE")
+        self.name_entry.focus_set()
 
-    def validate(self):
+    def ok(self):
         name = self.name_var.get().strip()
         target = self.target_var.get().strip()
         port = self.port_var.get().strip() or "22"
         if not name:
-            messagebox.showerror(APP_NAME, "Nickname is required.", parent=self)
-            return False
+            self.app.show_message("Nickname is required.", "error")
+            return
         if not target or "@" not in target:
-            messagebox.showerror(APP_NAME, "Target must look like user@host.", parent=self)
-            return False
+            self.app.show_message("Target must look like user@host.", "error")
+            return
         if not valid_port(port):
-            messagebox.showerror(APP_NAME, "Port must be a number from 1 to 65535.", parent=self)
-            return False
+            self.app.show_message("Port must be a number from 1 to 65535.", "error")
+            return
         self.result = {"name": name, "target": target, "port": str(int(port))}
-        return True
+        self.destroy()
+
+
+class PasswordDialog(ThemedModal):
+    def __init__(self, app: "SshtoGui", prompt: str):
+        self.prompt = prompt
+        super().__init__(app, "Key Setup")
+        self.build()
+
+    def build(self):
+        ttk.Label(self.content, text=self.prompt, style="Dialog.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        ttk.Label(self.content, text="Password").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=6)
+        self.password_var = tk.StringVar()
+        self.password_entry = ttk.Entry(self.content, textvariable=self.password_var, show="*", width=34, style="Cyber.TEntry")
+        self.password_entry.grid(row=1, column=1, sticky="ew", pady=6)
+        self.button_row("INSTALL")
+        self.password_entry.focus_set()
+
+    def ok(self):
+        self.result = self.password_var.get()
+        self.destroy()
+
+
+class ConfirmDialog(ThemedModal):
+    def __init__(self, app: "SshtoGui", prompt: str):
+        self.prompt = prompt
+        super().__init__(app, APP_NAME)
+        self.build()
+
+    def build(self):
+        ttk.Label(self.content, text=self.prompt, style="Dialog.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self.button_row("REMOVE")
+
+    def ok(self):
+        self.result = True
+        self.destroy()
+
+
+class MessageDialog(ThemedModal):
+    def __init__(self, app: "SshtoGui", text: str, kind: str = "info"):
+        self.text = text
+        self.kind = kind
+        super().__init__(app, APP_NAME)
+        self.build()
+
+    def build(self):
+        label_style = "DialogAccent.TLabel" if self.kind == "info" else "Dialog.TLabel"
+        ttk.Label(self.content, text=self.text, style=label_style, wraplength=420).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self.button_row("OK")
+
+    def ok(self):
+        self.result = True
+        self.destroy()
 
 
 class SshtoGui:
@@ -316,9 +412,11 @@ class SshtoGui:
         style.configure("Cyber.TFrame", background=colors["bg"])
         style.configure("Panel.TFrame", background=colors["panel"])
         style.configure("TLabel", background=colors["panel"], foreground=colors["ink"])
+        style.configure("Dialog.TLabel", background=colors["panel"], foreground=colors["ink"], font=("Segoe UI", 10))
+        style.configure("DialogAccent.TLabel", background=colors["panel"], foreground=colors["accent"], font=("Segoe UI", 10))
         style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=("Consolas", 9, "bold"))
         style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9))
-        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9, "bold"), justify="left")
+        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9, "bold"), justify="center")
         style.configure(
             "TButton",
             background=colors["panel_alt"],
@@ -379,7 +477,7 @@ class SshtoGui:
         main = ttk.Frame(self.root, padding=16, style="Cyber.TFrame")
         main.pack(fill=tk.BOTH, expand=True)
 
-        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel")
+        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel", anchor="center", justify="center")
         self.splash.pack(fill=tk.X, pady=(0, 12))
 
         toolbar = ttk.Frame(main, style="Cyber.TFrame")
@@ -436,6 +534,12 @@ class SshtoGui:
         self.populate()
         self.status_var.set(f"Theme: {self.theme_var.get()}")
 
+    def show_message(self, text: str, kind: str = "info") -> None:
+        MessageDialog(self, text, kind).show()
+
+    def confirm(self, text: str) -> bool:
+        return bool(ConfirmDialog(self, text).show())
+
     def reload(self) -> None:
         self.app_dir.mkdir(parents=True, exist_ok=True)
         if not self.servers_path.exists():
@@ -443,7 +547,7 @@ class SshtoGui:
         try:
             data = load_json(self.servers_path, {})
         except RuntimeError as exc:
-            messagebox.showerror(APP_NAME, str(exc), parent=self.root)
+            self.show_message(str(exc), "error")
             data = {}
         self.servers = {name: value for name, value in data.items() if isinstance(value, dict)}
         self.populate()
@@ -479,16 +583,16 @@ class SshtoGui:
     def require_selection(self) -> str | None:
         name = self.selected_name()
         if not name:
-            messagebox.showinfo(APP_NAME, "Select a saved server first.", parent=self.root)
+            self.show_message("Select a saved server first.")
             return None
         return name
 
     def add_server(self) -> None:
-        dialog = ServerDialog(self.root, "Add Server")
-        if not dialog.result:
+        result = ServerDialog(self, "Add Server").show()
+        if not result:
             return
-        name = dialog.result.pop("name")
-        self.servers[name] = dialog.result
+        name = result.pop("name")
+        self.servers[name] = result
         self.save_servers()
         self.tree.selection_set(name)
         self.status_var.set(f"Saved {name}")
@@ -499,13 +603,13 @@ class SshtoGui:
             return
         item = self.servers[name]
         values = {"name": name, "target": str(item.get("target", "")), "port": str(item.get("port", "22"))}
-        dialog = ServerDialog(self.root, "Edit Server", values)
-        if not dialog.result:
+        result = ServerDialog(self, "Edit Server", values).show()
+        if not result:
             return
-        new_name = dialog.result.pop("name")
+        new_name = result.pop("name")
         if new_name != name:
             self.servers.pop(name, None)
-        self.servers[new_name] = dialog.result
+        self.servers[new_name] = result
         self.save_servers()
         self.tree.selection_set(new_name)
         self.status_var.set(f"Updated {new_name}")
@@ -514,7 +618,7 @@ class SshtoGui:
         name = self.require_selection()
         if not name:
             return
-        if not messagebox.askyesno(APP_NAME, f"Remove '{name}'?", parent=self.root):
+        if not self.confirm(f"Remove '{name}'?"):
             return
         self.servers.pop(name, None)
         self.save_servers()
@@ -534,14 +638,14 @@ class SshtoGui:
         port = str(item.get("port", "22"))
         parsed = split_target(target)
         if not parsed:
-            messagebox.showerror(APP_NAME, "Target must look like user@host.", parent=self.root)
+            self.show_message("Target must look like user@host.", "error")
             return
         if paramiko is None:
-            messagebox.showerror(APP_NAME, "Internal key setup needs Paramiko. Reinstall SSHTO GUI with install-gui.sh.", parent=self.root)
+            self.show_message("Internal key setup needs Paramiko. Reinstall SSHTO GUI with install-gui.sh.", "error")
             return
 
         user, host = parsed
-        password = simpledialog.askstring(APP_NAME, f"Password for {target}", show="*", parent=self.root)
+        password = PasswordDialog(self, f"Password for {target}").show()
         if password is None:
             return
 
@@ -552,10 +656,10 @@ class SshtoGui:
             public_key = key_path.read_text(encoding="utf-8").strip()
             self.install_public_key(host, user, int(port), password, public_key)
         except Exception as exc:
-            messagebox.showerror(APP_NAME, f"Key setup failed:\n{exc}", parent=self.root)
+            self.show_message(f"Key setup failed:\n{exc}", "error")
             self.status_var.set("Key setup failed")
             return
-        messagebox.showinfo(APP_NAME, f"SSH key installed for {name}.", parent=self.root)
+        self.show_message(f"SSH key installed for {name}.")
         self.status_var.set(f"SSH key installed for {name}")
 
     def install_public_key(self, host: str, user: str, port: int, password: str, public_key: str) -> None:
@@ -581,13 +685,13 @@ class SshtoGui:
     def run_in_terminal(self, command: list[str]) -> None:
         full_command = terminal_command(command)
         if not full_command:
-            messagebox.showerror(APP_NAME, "No supported terminal emulator was found.\n\nRun this manually:\n" + " ".join(command), parent=self.root)
+            self.show_message("No supported terminal emulator was found.\n\nRun this manually:\n" + " ".join(command), "error")
             return
         try:
             subprocess.Popen(full_command)
             self.status_var.set("Started: " + " ".join(command))
         except OSError as exc:
-            messagebox.showerror(APP_NAME, f"Could not start command:\n{exc}", parent=self.root)
+            self.show_message(f"Could not start command:\n{exc}", "error")
 
 
 def main() -> int:

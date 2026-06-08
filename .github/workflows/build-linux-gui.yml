@@ -50,6 +50,32 @@ jobs:
           chmod +x dist/sshto-gui-linux-x86_64
           sha256sum dist/sshto-gui-linux-x86_64 > dist/sshto-gui-linux-x86_64.sha256
 
+      - name: Build Debian package
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          VERSION="${VERSION%-gui}"
+          PACKAGE_ROOT="dist/deb/sshto-gui_${VERSION}_amd64"
+          mkdir -p "$PACKAGE_ROOT/DEBIAN" "$PACKAGE_ROOT/usr/bin"
+          cp dist/sshto-gui-linux-x86_64 "$PACKAGE_ROOT/usr/bin/sshto-gui"
+          cp sshto "$PACKAGE_ROOT/usr/bin/sshto"
+          chmod 755 "$PACKAGE_ROOT/usr/bin/sshto-gui" "$PACKAGE_ROOT/usr/bin/sshto"
+          cat > "$PACKAGE_ROOT/DEBIAN/control" <<EOF
+          Package: sshto-gui
+          Version: $VERSION
+          Section: net
+          Priority: optional
+          Architecture: amd64
+          Depends: openssh-client, xterm | x-terminal-emulator
+          Maintainer: icantenosh
+          Description: SSHTO graphical SSH launcher
+           Quick SSH launcher GUI with saved server management and internal key setup.
+          EOF
+          sed -i 's/^          //' "$PACKAGE_ROOT/DEBIAN/control"
+          dpkg-deb --build "$PACKAGE_ROOT" "dist/sshto-gui_${VERSION}_amd64.deb"
+          sha256sum "dist/sshto-gui_${VERSION}_amd64.deb" > "dist/sshto-gui_${VERSION}_amd64.deb.sha256"
+
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -58,4 +84,6 @@ jobs:
           gh release upload "$TAG" \
             dist/sshto-gui-linux-x86_64 \
             dist/sshto-gui-linux-x86_64.sha256 \
+            dist/sshto-gui_*_amd64.deb \
+            dist/sshto-gui_*_amd64.deb.sha256 \
             --clobber

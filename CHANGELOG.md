@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added Debian package build for apt-style Ubuntu installs.
 - Added internal Linux GUI SSH key setup using Paramiko.
 - Restored the splash banner in the Linux GUI.
 - Updated the Linux GUI installer to install the standalone release binary, the CLI, and common Linux dependencies.

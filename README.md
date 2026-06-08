@@ -95,6 +95,12 @@ chmod +x sshto-gui-linux-x86_64
 ./sshto-gui-linux-x86_64
 ```
 
+Or install the Debian package from a GUI release:
+
+```bash
+sudo apt install ./sshto-gui_*_amd64.deb
+```
+
 Install the standalone Linux GUI, the `sshto` CLI, and common Linux dependencies to `~/.local/bin`:
 
 ```bash
