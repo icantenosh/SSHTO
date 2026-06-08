@@ -65,7 +65,7 @@ Linux saved server data lives at `${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool/ser
 
 ## Linux GUI
 
-Install `sshto-gui` to `~/.local/bin`:
+Install the standalone `sshto-gui`, the `sshto` CLI, and common Linux dependencies to `~/.local/bin`:
 
 ```bash
 curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
@@ -77,9 +77,11 @@ Run it:
 sshto-gui
 ```
 
-The Linux GUI needs Python 3, Python Tk support, OpenSSH, and a terminal emulator.
+The Linux GUI installer pulls the standalone GUI, the `sshto` CLI, OpenSSH,
+terminal support, and Python GUI/key-setup packages when your package manager is
+supported.
 On Debian or Ubuntu, Tk support is usually available with:
 
 ```bash
-sudo apt install python3-tk
+sudo apt install python3-tk python3-paramiko
 ```

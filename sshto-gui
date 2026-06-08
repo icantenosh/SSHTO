@@ -10,14 +10,31 @@ import shutil
 import subprocess
 import sys
 import tkinter as tk
+from getpass import getuser
+from socket import gethostname
 from pathlib import Path
 from tkinter import messagebox, simpledialog, ttk
+
+try:
+    import paramiko
+except ImportError:
+    paramiko = None
 
 
 APP_NAME = "SSHTO"
 CONFIG_NAME = "ssh-tool"
 SERVER_FILE_NAME = "servers.json"
 THEME_FILE_NAME = "gui-theme.json"
+SPLASH_TEXT = r"""
+   ________  ________  ___  ___  _________  ________
+  |\   ____\|\   ____\|\  \|\  \|\___   ___\\   __  \
+  \ \  \___|\ \  \___|\ \  \\\  \|___ \  \_\ \  \|\  \
+   \ \_____  \ \_____  \ \   __  \   \ \  \ \ \  \\\  \
+    \|____|\  \|____|\  \ \  \ \  \   \ \  \ \ \  \\\  \
+      ____\_\  \____\_\  \ \__\ \__\   \ \__\ \ \_______\
+     |\_________\_________\|__|\|__|    \|__|  \|_______|
+     \|_________\|_________|  << encrypted routes / fast shells >>
+""".strip("\n")
 
 
 THEMES = {
@@ -161,6 +178,37 @@ def valid_port(value: str) -> bool:
     return 1 <= port <= 65535
 
 
+def split_target(target: str) -> tuple[str, str] | None:
+    if "@" not in target:
+        return None
+    user, host = target.split("@", 1)
+    if not user or not host:
+        return None
+    return user, host
+
+
+def public_key_path() -> Path:
+    ssh_dir = Path.home() / ".ssh"
+    ed25519 = ssh_dir / "id_ed25519.pub"
+    rsa = ssh_dir / "id_rsa.pub"
+    if ed25519.exists():
+        return ed25519
+    if rsa.exists():
+        return rsa
+
+    ssh_dir.mkdir(mode=0o700, exist_ok=True)
+    private_key = ssh_dir / "id_ed25519"
+    result = subprocess.run(
+        ["ssh-keygen", "-t", "ed25519", "-N", "", "-C", f"{getuser()}@{gethostname()}", "-f", str(private_key)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "ssh-keygen could not create an SSH key.")
+    return ed25519
+
+
 def terminal_command(command: list[str]) -> list[str] | None:
     system = platform.system()
     if system == "Windows":
@@ -270,6 +318,7 @@ class SshtoGui:
         style.configure("TLabel", background=colors["panel"], foreground=colors["ink"])
         style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=("Consolas", 9, "bold"))
         style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9))
+        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9, "bold"), justify="left")
         style.configure(
             "TButton",
             background=colors["panel_alt"],
@@ -329,6 +378,9 @@ class SshtoGui:
         self.root.configure(bg=self.palette()["bg"])
         main = ttk.Frame(self.root, padding=16, style="Cyber.TFrame")
         main.pack(fill=tk.BOTH, expand=True)
+
+        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel")
+        self.splash.pack(fill=tk.X, pady=(0, 12))
 
         toolbar = ttk.Frame(main, style="Cyber.TFrame")
         toolbar.pack(fill=tk.X, pady=(0, 10))
@@ -477,10 +529,54 @@ class SshtoGui:
         name = self.require_selection()
         if not name:
             return
-        if shutil.which("sshto"):
-            self.run_in_terminal(["sshto", "keysetup", name])
-        else:
-            messagebox.showinfo(APP_NAME, "Install the sshto CLI first, then run key setup again.", parent=self.root)
+        item = self.servers[name]
+        target = str(item.get("target", ""))
+        port = str(item.get("port", "22"))
+        parsed = split_target(target)
+        if not parsed:
+            messagebox.showerror(APP_NAME, "Target must look like user@host.", parent=self.root)
+            return
+        if paramiko is None:
+            messagebox.showerror(APP_NAME, "Internal key setup needs Paramiko. Reinstall SSHTO GUI with install-gui.sh.", parent=self.root)
+            return
+
+        user, host = parsed
+        password = simpledialog.askstring(APP_NAME, f"Password for {target}", show="*", parent=self.root)
+        if password is None:
+            return
+
+        self.status_var.set(f"Installing SSH key on {name}...")
+        self.root.update_idletasks()
+        try:
+            key_path = public_key_path()
+            public_key = key_path.read_text(encoding="utf-8").strip()
+            self.install_public_key(host, user, int(port), password, public_key)
+        except Exception as exc:
+            messagebox.showerror(APP_NAME, f"Key setup failed:\n{exc}", parent=self.root)
+            self.status_var.set("Key setup failed")
+            return
+        messagebox.showinfo(APP_NAME, f"SSH key installed for {name}.", parent=self.root)
+        self.status_var.set(f"SSH key installed for {name}")
+
+    def install_public_key(self, host: str, user: str, port: int, password: str, public_key: str) -> None:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(hostname=host, port=port, username=user, password=password, timeout=20, look_for_keys=False, allow_agent=False)
+            command = (
+                "sh -c 'read -r key; umask 077; mkdir -p ~/.ssh; touch ~/.ssh/authorized_keys; "
+                "grep -qxF \"$key\" ~/.ssh/authorized_keys || printf \"%s\\n\" \"$key\" >> ~/.ssh/authorized_keys; "
+                "chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'"
+            )
+            stdin, stdout, stderr = client.exec_command(command)
+            stdin.write(public_key + "\n")
+            stdin.channel.shutdown_write()
+            exit_status = stdout.channel.recv_exit_status()
+            if exit_status != 0:
+                error = stderr.read().decode("utf-8", "replace").strip()
+                raise RuntimeError(error or f"remote command exited with status {exit_status}")
+        finally:
+            client.close()
 
     def run_in_terminal(self, command: list[str]) -> None:
         full_command = terminal_command(command)

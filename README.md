@@ -95,7 +95,7 @@ chmod +x sshto-gui-linux-x86_64
 ./sshto-gui-linux-x86_64
 ```
 
-Install the Linux GUI script to `~/.local/bin`:
+Install the standalone Linux GUI, the `sshto` CLI, and common Linux dependencies to `~/.local/bin`:
 
 ```bash
 curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
@@ -113,7 +113,9 @@ The Linux GUI uses the same saved server file as the Linux command-line tool:
 ${XDG_CONFIG_HOME:-$HOME/.config}/ssh-tool/servers.json
 ```
 
-It can add, edit, remove, search, connect, and run SSH key setup. Connecting opens
+It can add, edit, remove, search, connect, and run SSH key setup. Key setup asks
+for the server password in the GUI and installs your public key without opening a
+terminal. Connecting opens
 your saved server in a terminal emulator such as `x-terminal-emulator`,
 `gnome-terminal`, `konsole`, `xfce4-terminal`, or `xterm`.
 
@@ -166,6 +168,6 @@ The Linux version does not store passwords. Use `sshto keysetup <nickname>` to i
 
 - `sshto.exe` requires Windows PowerShell and Windows OpenSSH.
 - `sshto` for Linux requires Bash, Python 3, and OpenSSH.
-- `sshto-gui` for Linux requires Python 3, Python Tk support, OpenSSH, and a terminal emulator.
+- `install-gui.sh` installs the standalone Linux GUI plus common dependencies when your package manager is supported.
 - Password auto-login is only possible if `plink.exe` is installed and available on `PATH`.
 - `keysetup` is the preferred way to avoid typing server passwords.
