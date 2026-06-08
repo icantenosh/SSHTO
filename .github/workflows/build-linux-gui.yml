@@ -1,0 +1,61 @@
+name: Build Linux GUI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to upload the Linux GUI asset to"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-gui:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.release.tag_name, 'gui')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Build standalone Linux GUI
+        run: |
+          pyinstaller --onefile --windowed --name sshto-gui-linux-x86_64 sshto-gui
+          chmod +x dist/sshto-gui-linux-x86_64
+          sha256sum dist/sshto-gui-linux-x86_64 > dist/sshto-gui-linux-x86_64.sha256
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          gh release upload "$TAG" \
+            dist/sshto-gui-linux-x86_64 \
+            dist/sshto-gui-linux-x86_64.sha256 \
+            --clobber

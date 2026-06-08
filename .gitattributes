@@ -6,3 +6,4 @@ sshto-gui text eol=lf
 CHECKSUMS.txt text eol=lf
 *.md text eol=lf
 LICENSE text eol=lf
+.github/workflows/*.yml text eol=lf

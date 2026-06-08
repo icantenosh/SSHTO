@@ -82,6 +82,19 @@ Theme selection is persistent and saved per Windows user.
 
 ### Linux
 
+Download the standalone Linux GUI from a GUI release:
+
+```text
+sshto-gui-linux-x86_64
+```
+
+Make it executable and run it:
+
+```bash
+chmod +x sshto-gui-linux-x86_64
+./sshto-gui-linux-x86_64
+```
+
 Install the Linux GUI script to `~/.local/bin`:
 
 ```bash

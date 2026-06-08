@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added release workflow for standalone Linux GUI binaries.
 - Added Linux `sshto-gui` Python/Tk source.
 - Added Linux GUI installer script.
 - Added standalone Windows GUI as `sshto-gui.exe`.
