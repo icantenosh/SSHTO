@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tkinter as tk
+import tkinter.font as tkfont
 from getpass import getuser
 from socket import gethostname
 from pathlib import Path
@@ -25,18 +26,16 @@ APP_NAME = "SSHTO"
 CONFIG_NAME = "ssh-tool"
 SERVER_FILE_NAME = "servers.json"
 THEME_FILE_NAME = "gui-theme.json"
-SPLASH_LINES = [
-    r"   ________  ________  ___  ___  _________  ________",
-    r"  |\   ____\|\   ____\|\  \|\  \|\___   ___\\   __  \\",
-    r"  \ \  \___|\ \  \___|\ \  \\\  \|___ \  \_\ \  \|\  \\",
-    r"   \ \_____  \ \_____  \ \   __  \   \ \  \ \ \  \\\  \\",
-    r"    \|____|\  \|____|\  \ \  \ \  \   \ \  \ \ \  \\\  \\",
-    r"      ____\_\  \____\_\  \ \__\ \__\   \ \__\ \ \_______\\",
-    r"     |\_________\_________\|__|\|__|    \|__|  \|_______|",
-    r"     \|_________\|_________|  << encrypted routes / fast shells >>",
-]
-SPLASH_WIDTH = max(len(line) for line in SPLASH_LINES)
-SPLASH_TEXT = "\n".join(line.center(SPLASH_WIDTH) for line in SPLASH_LINES)
+SPLASH_TEXT = (
+    "   ________  ________  ___  ___  _________  ________\n"
+    "  |\\   ____\\|\\   ____\\|\\  \\|\\  \\|\\___   ___\\\\   __  \\\n"
+    "  \\ \\  \\___|\\ \\  \\___|\\ \\  \\\\\\  \\|___ \\  \\_\\ \\  \\|\\  \\\n"
+    "   \\ \\_____  \\ \\_____  \\ \\   __  \\   \\ \\  \\ \\ \\  \\\\\\  \\\n"
+    "    \\|____|\\  \\|____|\\  \\ \\  \\ \\  \\   \\ \\  \\ \\ \\  \\\\\\  \\\n"
+    "      ____\\_\\  \\____\\_\\  \\ \\__\\ \\__\\   \\ \\__\\ \\ \\_______\\\n"
+    "     |\\_________\\_________\\|__|\\|__|    \\|__|  \\|_______|\n"
+    "     \\|_________\\|_________|  << encrypted routes / fast shells >>"
+)
 
 
 THEMES = {
@@ -240,6 +239,14 @@ def sh_quote(value: str) -> str:
     return "'" + value.replace("'", "'\"'\"'") + "'"
 
 
+def font_family(root: tk.Tk, candidates: tuple[str, ...], fallback: str) -> str:
+    available = set(tkfont.families(root))
+    for family in candidates:
+        if family in available:
+            return family
+    return fallback
+
+
 class ThemedModal(tk.Toplevel):
     def __init__(self, app: "SshtoGui", title: str):
         super().__init__(app.root)
@@ -407,18 +414,23 @@ class SshtoGui:
         style = ttk.Style(self.root)
         if "clam" in style.theme_names():
             style.theme_use("clam")
-        mono = ("Consolas", 10)
-        label_font = ("Segoe UI", 10)
+        mono_family = font_family(self.root, ("Consolas", "Cascadia Mono", "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Monospace"), "TkFixedFont")
+        sans_family = font_family(self.root, ("Segoe UI", "Ubuntu", "DejaVu Sans", "Noto Sans", "Arial"), "TkDefaultFont")
+        mono = (mono_family, 10)
+        mono_small = (mono_family, 9)
+        mono_small_bold = (mono_family, 9, "bold")
+        mono_heading = (mono_family, 10, "bold")
+        label_font = (sans_family, 10)
 
         style.configure(".", background=colors["bg"], foreground=colors["ink"], fieldbackground=colors["entry"], font=label_font)
         style.configure("Cyber.TFrame", background=colors["bg"])
         style.configure("Panel.TFrame", background=colors["panel"])
         style.configure("TLabel", background=colors["panel"], foreground=colors["ink"])
-        style.configure("Dialog.TLabel", background=colors["panel"], foreground=colors["ink"], font=("Segoe UI", 10))
-        style.configure("DialogAccent.TLabel", background=colors["panel"], foreground=colors["accent"], font=("Segoe UI", 10))
-        style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=("Consolas", 9, "bold"))
-        style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9))
-        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=("Consolas", 9, "bold"), justify="center")
+        style.configure("Dialog.TLabel", background=colors["panel"], foreground=colors["ink"], font=label_font)
+        style.configure("DialogAccent.TLabel", background=colors["panel"], foreground=colors["accent"], font=label_font)
+        style.configure("Muted.TLabel", background=colors["bg"], foreground=colors["muted"], font=mono_small_bold)
+        style.configure("Status.TLabel", background=colors["bg"], foreground=colors["accent"], font=mono_small)
+        style.configure("Splash.TLabel", background=colors["bg"], foreground=colors["accent"], font=mono_small_bold, justify="center")
         style.configure(
             "TButton",
             background=colors["panel_alt"],
@@ -429,7 +441,7 @@ class SshtoGui:
             focusthickness=1,
             focuscolor=colors["accent"],
             padding=(12, 7),
-            font=("Consolas", 9, "bold"),
+            font=mono_small_bold,
         )
         style.map(
             "TButton",
@@ -469,7 +481,7 @@ class SshtoGui:
             bordercolor=[("readonly", colors["line"])],
         )
         style.configure("Treeview", background=colors["entry"], fieldbackground=colors["entry"], foreground=colors["ink"], borderwidth=0, rowheight=31, font=mono)
-        style.configure("Treeview.Heading", background=colors["panel_alt"], foreground=colors["accent"], bordercolor=colors["line"], relief="flat", font=("Consolas", 10, "bold"))
+        style.configure("Treeview.Heading", background=colors["panel_alt"], foreground=colors["accent"], bordercolor=colors["line"], relief="flat", font=mono_heading)
         style.map("Treeview", background=[("selected", colors["select"])], foreground=[("selected", colors["accent"])])
         style.configure("Vertical.TScrollbar", background=colors["panel_alt"], troughcolor=colors["entry"], bordercolor=colors["line"], arrowcolor=colors["accent"])
 
