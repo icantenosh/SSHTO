@@ -40,7 +40,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk
+          sudo apt-get install -y apt-utils dpkg-dev python3-tk
           python -m pip install --upgrade pip
           python -m pip install pyinstaller paramiko
 
@@ -75,6 +75,41 @@ jobs:
           sed -i 's/^          //' "$PACKAGE_ROOT/DEBIAN/control"
           dpkg-deb --build "$PACKAGE_ROOT" "dist/sshto-gui_${VERSION}_amd64.deb"
           sha256sum "dist/sshto-gui_${VERSION}_amd64.deb" > "dist/sshto-gui_${VERSION}_amd64.deb.sha256"
+
+      - name: Build APT repository
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          VERSION="${TAG#v}"
+          VERSION="${VERSION%-gui}"
+          APT_ROOT="dist/apt-repo"
+          mkdir -p "$APT_ROOT/pool/main/s/sshto-gui" "$APT_ROOT/dists/stable/main/binary-amd64"
+          cp "dist/sshto-gui_${VERSION}_amd64.deb" "$APT_ROOT/pool/main/s/sshto-gui/"
+          cd "$APT_ROOT"
+          dpkg-scanpackages --arch amd64 pool > dists/stable/main/binary-amd64/Packages
+          gzip -9c dists/stable/main/binary-amd64/Packages > dists/stable/main/binary-amd64/Packages.gz
+          apt-ftparchive release dists/stable > dists/stable/Release
+
+      - name: Publish APT repository
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add apt-pages origin/gh-pages
+          else
+            git worktree add --detach apt-pages
+            git -C apt-pages checkout --orphan gh-pages
+            git -C apt-pages rm -rf . || true
+          fi
+          rm -rf apt-pages/*
+          cp -R dist/apt-repo/. apt-pages/
+          touch apt-pages/.nojekyll
+          git -C apt-pages add .
+          git -C apt-pages commit -m "Publish APT repo for $TAG" || exit 0
+          git -C apt-pages push origin HEAD:gh-pages
 
       - name: Upload release assets
         env:

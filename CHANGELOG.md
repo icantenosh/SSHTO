@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added GitHub-hosted APT repository publishing for `sudo apt install sshto-gui`.
 - Added Debian package build for apt-style Ubuntu installs.
 - Added internal Linux GUI SSH key setup using Paramiko.
 - Restored the splash banner in the Linux GUI.
