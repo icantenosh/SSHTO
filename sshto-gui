@@ -36,6 +36,7 @@ SPLASH_TEXT = (
     "     |\\_________\\_________\\|__|\\|__|    \\|__|  \\|_______|\n"
     "     \\|_________\\|_________|  << encrypted routes / fast shells >>"
 )
+SPLASH_LINES = SPLASH_TEXT.splitlines()
 
 
 THEMES = {
@@ -421,6 +422,7 @@ class SshtoGui:
         mono_small_bold = (mono_family, 9, "bold")
         mono_heading = (mono_family, 10, "bold")
         label_font = (sans_family, 10)
+        self.splash_font = mono_small_bold
 
         style.configure(".", background=colors["bg"], foreground=colors["ink"], fieldbackground=colors["entry"], font=label_font)
         style.configure("Cyber.TFrame", background=colors["bg"])
@@ -484,6 +486,8 @@ class SshtoGui:
         style.configure("Treeview.Heading", background=colors["panel_alt"], foreground=colors["accent"], bordercolor=colors["line"], relief="flat", font=mono_heading)
         style.map("Treeview", background=[("selected", colors["select"])], foreground=[("selected", colors["accent"])])
         style.configure("Vertical.TScrollbar", background=colors["panel_alt"], troughcolor=colors["entry"], bordercolor=colors["line"], arrowcolor=colors["accent"])
+        if hasattr(self, "splash"):
+            self.configure_splash()
 
     def build_ui(self) -> None:
         self.configure_styles()
@@ -491,7 +495,13 @@ class SshtoGui:
         main = ttk.Frame(self.root, padding=16, style="Cyber.TFrame")
         main.pack(fill=tk.BOTH, expand=True)
 
-        self.splash = ttk.Label(main, text=SPLASH_TEXT, style="Splash.TLabel", anchor="center", justify="left")
+        self.splash = tk.Canvas(
+            main,
+            borderwidth=0,
+            highlightthickness=0,
+            takefocus=0,
+        )
+        self.configure_splash()
         self.splash.pack(anchor=tk.CENTER, pady=(0, 12))
 
         toolbar = ttk.Frame(main, style="Cyber.TFrame")
@@ -540,6 +550,29 @@ class SshtoGui:
 
         status = ttk.Label(main, textvariable=self.status_var, style="Status.TLabel", anchor="w")
         status.pack(fill=tk.X, pady=(10, 0))
+
+    def configure_splash(self) -> None:
+        colors = self.palette()
+        splash_font = tkfont.Font(root=self.root, font=self.splash_font)
+        line_height = splash_font.metrics("linespace")
+        width = max(splash_font.measure(line) for line in SPLASH_LINES)
+        height = line_height * len(SPLASH_LINES)
+
+        self.splash.configure(
+            background=colors["bg"],
+            width=width,
+            height=height,
+        )
+        self.splash.delete("all")
+        self.splash.create_text(
+            0,
+            0,
+            anchor="nw",
+            fill=colors["accent"],
+            font=self.splash_font,
+            justify=tk.LEFT,
+            text=SPLASH_TEXT,
+        )
 
     def change_theme(self) -> None:
         write_json(self.theme_path, {"theme": self.theme_var.get()})

@@ -10,30 +10,58 @@ Quick SSH launcher for Windows and Linux.
 
 ## Install
 
-### Windows
+### Windows CLI
 
-Install from PowerShell:
+Run in PowerShell:
 
 ```powershell
 irm https://github.com/icantenosh/SSHTO/raw/main/install.ps1 | iex
 ```
 
-Restart PowerShell, then test it:
+Restart PowerShell, then run:
 
 ```powershell
 sshto help
 ```
 
-### Linux
+### Windows GUI
 
-```bash
-curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install.sh | sh
+Run in PowerShell:
+
+```powershell
+irm https://github.com/icantenosh/SSHTO/raw/main/install-gui.ps1 | iex
 ```
 
-Test it:
+Restart PowerShell, then run:
+
+```powershell
+sshto-gui
+```
+
+### Linux GUI + CLI
+
+Run in a terminal:
+
+```bash
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
+```
+
+Then run:
+
+```bash
+sshto-gui
+```
+
+or:
 
 ```bash
 sshto help
+```
+
+### Linux CLI Only
+
+```bash
+curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install.sh | sh
 ```
 
 ## Commands
@@ -57,20 +85,6 @@ sshto --help                       Same as help
 
 ### Windows
 
-The Windows GUI is available as one standalone file:
-
-```text
-sshto-gui.exe
-```
-
-Download `sshto-gui.exe`, place it anywhere, and run it.
-
-Install it from PowerShell:
-
-```powershell
-irm https://github.com/icantenosh/SSHTO/raw/main/install-gui.ps1 | iex
-```
-
 The GUI uses the same saved server file as the command-line tool and can add,
 edit, remove, connect, and run SSH key setup. Server data stays at:
 
@@ -82,40 +96,19 @@ Theme selection is persistent and saved per Windows user.
 
 ### Linux
 
-Download the standalone Linux GUI from a GUI release:
-
-```text
-sshto-gui-linux-x86_64
-```
-
-Make it executable and run it:
+The Linux installer puts `sshto-gui` and `sshto` in `~/.local/bin` and installs
+common dependencies when your package manager is supported. Run the GUI with:
 
 ```bash
-chmod +x sshto-gui-linux-x86_64
-./sshto-gui-linux-x86_64
+sshto-gui
 ```
 
-Add the SSHTO APT repository once, then install the GUI with apt:
+If you prefer apt, add the SSHTO repository once:
 
 ```bash
 echo 'deb [trusted=yes] https://raw.githubusercontent.com/icantenosh/SSHTO/gh-pages stable main' | sudo tee /etc/apt/sources.list.d/sshto.list
 sudo apt update
 sudo apt install sshto-gui
-```
-
-You can still download the `.deb` from a GUI release and install it directly with
-`sudo apt install ./sshto-gui_*_amd64.deb`.
-
-Install the standalone Linux GUI, the `sshto` CLI, and common Linux dependencies to `~/.local/bin`:
-
-```bash
-curl -fsSL https://github.com/icantenosh/SSHTO/raw/main/install-gui.sh | sh
-```
-
-Run it:
-
-```bash
-sshto-gui
 ```
 
 The Linux GUI uses the same saved server file as the Linux command-line tool:
